@@ -31,6 +31,7 @@ This project is a work in progress and right now it is still in the design phase
 	 1. A client (PC) will connect, send its IP address and port, then disconnect. This will be called Server Registration.
 	 1. It will support up to 10 clients
 	 1. When the an event occurs the ESP32 will connect to the "client". Now the "client" will host a server application at the IP and port.
+	 1. The data will probably be sent in a format similiar to aREST https://www.home-assistant.io/integrations/arest/
    
 1. Server application to receive the SmartMailBox events. This will probably a separate project that will use a raspberry pi. Following are some ideas.
    1. The Pi will control an old CD drive that will popup a prop letter that says you got mail.
