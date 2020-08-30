@@ -11,9 +11,11 @@ This project is a work in progress and right now it is still in the design phase
 * Limit Switch			digital on/off connected to the mailbox door. Connected when the door is closed and disconnected when the door is open.
 
 ## Hardware to MCU Pinout
-* Vertical IR Sensor RTC_GPIO0, ADC1_CH0, GPIO36, pin14
-* Horizontal IR Sensor RTC_GPIO4, ADC1_CH6, GPIO34, pin12
-* limit switch RTC_GPIO9, GPIO32, pin10
+* Vertical IR LED GPIO13
+* Horizontal IR LED GPIO16
+* Vertical IR detector RTC_GPIO0, ADC1_CH0, GPIO36, pin14
+* Horizontal IR detector RTC_GPIO4, ADC1_CH6, GPIO34, pin12
+* limit switch GPIO17
 
 
 ## Software Requirements
@@ -36,6 +38,8 @@ This project is a work in progress and right now it is still in the design phase
 1. Server application to receive the SmartMailBox events. This will probably a separate project that will use a raspberry pi. Following are some ideas.
    1. The Pi will control an old CD drive that will popup a prop letter that says you got mail.
    1. Use a servo to swing to upright position to indicate mail arrived.
+   
+1. Server Host URL will be a max of 512 bytes.
 	
 ### Optional
 1. The ESP32 will register SmartHomeDevice mDNS service.

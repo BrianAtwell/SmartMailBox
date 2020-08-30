@@ -1,0 +1,98 @@
+<html>
+  <head>
+    <title>ESP32 Demo</title>
+	<script src='https://cdn.jsdelivr.net/npm/chart.js@2.9.3/dist/Chart.min.js'></script>
+	<script src='https://code.jquery.com/jquery-3.5.1.min.js'></script>
+    <style>
+      body { background-color: #cccccc; font-family: Arial, Helvetica, Sans-Serif; Color: #000088; }
+    </style>
+	<script>
+	$(document).ready(function(){
+	});
+	</script>
+  </head>
+  <body>
+    <h1>Smartmail Box</h1>
+	<button id="randomizeData">Randomize Data</button>
+	<div class="chart-container" style="position: relative; height:80vh; width:90vw">
+	<canvas id="myChart" width="undefined" height="undefined"></canvas>
+	<script>
+	
+	function getRandomInt(min, max) {
+	  min = Math.ceil(min);
+	  max = Math.floor(max);
+	  return Math.floor(Math.random() * (max - min) + min);
+	}
+	
+	function generateAnalogChartData(){
+		for (var i = 0, len = maxDataPoints; i < len; ++i) {
+			hAnalogIR[i] = getRandomInt(0, 4095);
+		}
+		
+		for (var i = 0, len = maxDataPoints; i < len; ++i) {
+			vAnalogIR[i] = getRandomInt(0, 4095);
+		}
+		
+		for (var i = 0, len = maxDataPoints; i < len; ++i) {
+			if(i==0)
+			{
+				labels[i] = getRandomInt(100, 400);
+			}
+			else
+			{
+				labels[i] = labels[i-1]+getRandomInt(100, 400);
+			}
+		}
+	}
+	
+	var maxDataPoints=15;
+	var hAnalogIR = [];
+	var vAnalogIR = [];
+	var labels = 	 [];
+	
+	generateAnalogChartData();
+	
+	var analogChartConfig = {
+		"type":"line",
+		"data": {
+			"labels":labels,
+			"datasets":[{
+					"label":"Horizontal IR",
+					"data":hAnalogIR,
+					"fill":false,
+					"borderColor":"rgb(75, 192, 192)",
+					"lineTension":0.1
+				},
+				{
+					"label":"Vertical IR",
+					"data":vAnalogIR,
+					"fill":false,
+					"borderColor":"rgb(255, 50, 50)",
+					"lineTension":0.1
+				}]
+		},
+		"tooltips": {
+					mode: 'index'
+				},
+		"options":{
+			"responsive": true,
+			"maintainAspectRatio": false,
+			yAxes: [{
+				ticks: {
+					beginAtZero:true
+				}
+			}]
+		}
+	};
+	
+	window.onload = function() {
+		var ctx = document.getElementById('myChart').getContext('2d');
+		window.analogChart = new Chart(ctx, analogChartConfig);
+	};
+	document.getElementById('randomizeData').addEventListener('click', function() {
+		generateAnalogChartData();
+		window.analogChart.update();
+	});
+	</script></div>
+  </body>
+</html>

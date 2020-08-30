@@ -1,0 +1,45 @@
+<html>
+  <head>
+    <title>ESP32 Demo</title>
+	<!-- Load plotly.js into the DOM -->
+	<script src='https://cdn.plot.ly/plotly-latest.js'></script>
+	<script src='https://code.jquery.com/jquery-3.5.1.min.js'></script>
+    <style>
+      body { background-color: #cccccc; font-family: Arial, Helvetica, Sans-Serif; Color: #000088; }
+    </style>
+	<script>
+	$(document).ready(function(){
+
+		// Plotting the Graph
+
+		var trace={
+		x:[1,2,3,4,5,6,7],
+		y:[5,7,6,7,8,9,8],
+		mode: 'lines+markers',
+		name: 'Vertial IR'};
+		
+		var trace1={
+		x:[1,2,3,4,5,6,7],
+		y:[4,2,5,2,1,7,3],
+		mode: 'lines+markers',
+		name: 'Horizontal IR'};
+		
+		var data = [trace,trace1];
+		var layout = {title : "Simple JavaScript Graph"};
+		plot1 = Plotly.newPlot(
+		  'plotly_div',
+		   data,
+		   layout);
+		   
+		//trace.x.push(11,12);
+		//trace.y.push(7,6);
+		
+		Plotly.extendTraces('plotly_div', {x:[[9,10]], y: [[12,15]]}, [0]);
+	});
+	</script>
+  </head>
+  <body>
+    <h1>Smartmail Box</h1>
+	<div id='plotly_div'><!-- Plotly chart will be drawn inside this DIV --></div>
+  </body>
+</html>

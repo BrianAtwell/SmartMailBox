@@ -1,0 +1,6 @@
+{
+	"url" : "http://255.255.255.255/test/",
+	"name" : "AutoServ",
+	"port" : 65535,
+	"refreshTimeoutMS" : "1000000"
+}

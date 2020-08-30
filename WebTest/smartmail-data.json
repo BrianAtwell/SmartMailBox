@@ -1,0 +1,20 @@
+{
+	"Current":{
+		"time": 1126,
+		"timestr": null,
+		"HorizontalIRAnalog": 4095,
+		"VerticalIRAnalog": 4095,
+		"HorizontalIRState": 0,
+		"VeriticalIRState": 0,
+		"DoorState": 0
+	},
+	"Changes": [{
+		"time": 1126,
+		"timestr": null,
+		"HorizontalIRAnalog": 4095,
+		"VerticalIRAnalog": 4095,
+		"HorizontalIRState": 0,
+		"VeriticalIRState": 0,
+		"DoorState": 0
+	}]
+}

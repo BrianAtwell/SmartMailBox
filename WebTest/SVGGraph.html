@@ -1,0 +1,89 @@
+<html>
+  <head>
+    <title>Smart Mailbox</title>
+    <style>
+      body { background-color: #cccccc; font-family: Arial, Helvetica, Sans-Serif; Color: #000088; }
+    </style>
+	<script>
+	function typedArrayToURL(typedArray, mimeType) {
+		var myblob = new Blob([typedArray.buffer], {type: mimeType});
+		myblob.name="graph.svg";
+		return URL.createObjectURL(myblob);
+	}
+	
+	function setupSVGLink()
+	{
+		var text = document.getElementById("graphsvg").outerHTML;
+		var enc = new TextEncoder(); // always utf-8
+		const bytes = enc.encode(text);
+		//console.log(bytes);
+		//document.getElementById("svgLink");
+		const url = typedArrayToURL(bytes, 'image/svg+xml');
+		var svgAnchor = document.getElementById("svgLink");
+		svgAnchor.href = url;
+		svgAnchor.download = "graph.svg";
+	}
+	
+	function getSvgLineGroups()
+	{
+		var nodes = document.getElementById("graphsvg").getElementsByTagName("g");
+		var len = nodes.length;
+		var nodeArray = [];
+		
+		for(var i = 0; i<len; i++)
+		{
+			if(nodes[i].getAttribute("class") == "line")
+			{
+				nodeArray.push(nodes[i]);
+			}
+		}
+		
+		return nodeArray;
+	}
+	
+	function addPointSVG(xObj, yPos)
+	{
+		//xObj["time"]=5;
+		//xObj["timestr"]="8-24-2020 3:59";
+		
+		var nodes = getSvgLineGroups();
+		if(nodes.length>0)
+		{
+			nodes[length-1].
+		}
+	}
+	
+	var svgGraphData = {
+		sensordata : [
+			{
+				"time" : 1000,
+				"timestr" : "8-24-2020 3:59",
+				"hIR" : 3200,
+				"vIR" : 2777,
+				"door" : true
+			}
+		],
+	};
+	
+	window.addEventListener("load", function(){
+		setupSVGLink();
+		addPointSVG(0,0);
+	});
+	</script>
+  </head>
+  <body>
+    <h1>Smart Mailbox</h1>
+    <svg id="graphsvg" width="100%" height="auto" viewbox="0 0 15356 4095" preserveAspectRatio="none">
+		<rect width="15356" height="4095" fill="rgb(250, 230, 210)" stroke-width="35" stroke="rgb(0, 0, 0)" />
+		<g class="line">
+			<g class="point">
+				<g stroke="black">
+					<line x1="0" y1="0" x2="1000" y2="4095" stroke-width="25" />
+				</g>
+				<text x="1000" y="3900" font-size="125">8-24-2020 1:30 PM</text>
+			</g>
+		</g>
+	</svg>
+	<a id="svgLink">Download SVG</a>
+  </body>
+</html>

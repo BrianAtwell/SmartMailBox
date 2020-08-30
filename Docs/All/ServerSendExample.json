@@ -1,0 +1,7 @@
+{
+	"xIRAnalog" : 65535,
+	"yIRAnalog" : 65535,
+	"xIRDigital" : 0,
+	"yIRDigital" : 0,
+	"doorOpen" : 0
+}
