@@ -7,7 +7,7 @@
 
 #include<functional>
 
- class BoolWatch
+class BoolWatch
 {
 public:
 

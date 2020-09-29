@@ -41,7 +41,7 @@ public:
 
   void update()
   {
-    if(*analogValue > maxThreshold)
+    if(*analogValue >= maxThreshold)
     {
       if(getValidState() != BINARYCONVERT_HIGH)
       {
@@ -50,7 +50,7 @@ public:
       lastValid = *analogValue;
     }
 
-    if(*analogValue < minThreshold)
+    if(*analogValue <= minThreshold)
     {
       if(getValidState() != BINARYCONVERT_LOW)
       {
@@ -72,11 +72,11 @@ private:
 
   enum BINARYCONVERTENUM getState(int *lAnalogValue)
   {
-    if(*lAnalogValue > maxThreshold)
+    if(*lAnalogValue >= maxThreshold)
     {
       return BINARYCONVERT_HIGH;
     }
-    else if(*lAnalogValue < minThreshold)
+    else if(*lAnalogValue <= minThreshold)
     {
       return BINARYCONVERT_LOW;
     }

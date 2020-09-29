@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>SmartMail Box Demo</title>
+	<!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.13.0/moment.min.js"></script> -->
+	<script src='https://cdn.jsdelivr.net/npm/chart.js@2.9.3/dist/Chart.min.js'></script>
+    <style>
+      body { background-color: #cccccc; font-family: Arial, Helvetica, Sans-Serif; Color: #000088; }
+	  #msgDiv {
+		position: fixed;
+		bottom: 0;
+		left: 0;
+		z-index: 99;
+	  }
+	  @keyframes fadeInMsg {
+		from {opacity: 0.5;}
+		to {opacity: 1.0;}
+	  }
+	  @keyframes fadeOutMsg {
+		from {opacity: 1.0;}
+		to {opacity: 0;}
+	  }
+	  @keyframes LoadingCrossFade {
+		from {background-color: rgb(190, 255, 190);}
+		to {background-color: rgb(190, 190, 255);}
+	  }
+	  
+	  @keyframes LimitDivSuccess {
+		from {background-color: rgb(120, 120, 255);}
+		to {background-color: rgb(190, 190, 255);}
+	  }
+	  
+	  @keyframes LimitDivFail {
+		from {background-color: rgb(255, 120, 120);}
+		to {background-color: rgb(255, 190, 190);}
+	  }
+	  
+	  .dispMsg {
+		background: rgba(200, 255, 200, 0.65);
+		padding: 5px 10px 5px 10px;
+		margin: 1px 1px 1px 1px;
+		border: 1px solid black;
+		border-radius: 10px;
+		color: #000000;
+	  }
+	  .fadeInMsg {
+		animation-name: fadeInMsg;
+		animation-duration: 2s;
+		animation-iteration-count: 1;
+	  }
+	  
+	  .fadeOutMsg {
+		animation-name: fadeOutMsg;
+		animation-duration: 4s;
+		animation-iteration-count: 1;
+	  }
+	  
+	  .singleLine {
+		display: inline-block;
+	  }
+	  
+	  .limitSingleContainer {
+		display: inline-block;
+		border: 1px solid rgb(100, 150, 255);
+		padding: 4px 5px 4px 5px;
+		margin: 1px 1px 1px 1px;
+	  }
+	  
+	  .limitDivLoading {
+		animation-name: LoadingCrossFade;
+		animation-duration: 4s;
+		animation-iteration-count: infinite;
+	  }
+	  
+	  .limitDivSuccess {
+		animation-name: LimitDivSuccess;
+		animation-duration: 4s;
+		animation-iteration-count: 1;
+	  }
+	  
+	  .limitDivFail {
+		animation-name: LimitDivFail;
+		animation-duration: 4s;
+		animation-iteration-count: 1;
+	  }
+	  
+	  #limitDivContainer {
+		display: inline-block;
+	  }
+    </style>
+  </head>
+  <body>
+    <h1>Smartmail Box</h1>
+	<audio id="GotMailAudio">
+		<source src="YouGotMail.mp3" type="audio/mpeg">
+		Your browser does not support the audio element.
+	</audio>
+	<audio id="MailRemovedAudio">
+		<source src="MailRemoved.mp3" type="audio/mpeg">
+		Your browser does not support the audio element.
+	</audio>
+	<div class="charts-container">
+		<div class="chart-container" style="position: relative; height:40vh; width:90vw">
+			<canvas id="analogLiveChart" width="undefined" height="undefined"></canvas>
+		</div>
+		<div>
+			<div class="chart-container" style="position: relative; height:40vh; width:30vw; display:inline-block;">
+				<canvas id="hIRStateLiveChart" width="undefined" height="undefined"></canvas>
+			</div>
+			<div class="chart-container" style="position: relative; height:40vh; width:30vw; display:inline-block;">
+				<canvas id="vIRStateLiveChart" width="undefined" height="undefined"></canvas>
+			</div>
+			<div class="chart-container" style="position: relative; height:40vh; width:30vw; display:inline-block;">
+				<canvas id="doorLiveChart" width="undefined" height="undefined"></canvas>
+			</div>
+		</div>
+	<script>
+	
+	function removeOnAnimationFinish(elem, rClass)
+	{
+		var autoRemoveOnAnimationFinish = function(event) {
+			var node = event.target.getAttributeNode("class");
+			if(node != undefined)
+			{
+				node.value = node.value.replace(rClass, "");
+			}
+			elem.removeEventListener("webkitAnimationEnd", autoRemoveOnAnimationFinish);
+			elem.removeEventListener("animationend", autoRemoveOnAnimationFinish);
+		}
+		elem.addEventListener("webkitAnimationEnd", autoRemoveOnAnimationFinish);  // Code for Chrome, Safari and Opera
+		elem.addEventListener("animationend", autoRemoveOnAnimationFinish);        // Standard syntax
+	}
+	
+	function setAttribute(elem, attrib, newAttribVal)
+	{
+		var classAttrNode = elem.getAttributeNode(attrib);
+		if(classAttrNode == undefined)
+		{
+			var att = document.createAttribute(attrib);       // Create a "class" attribute
+			att.value = newAttribVal;                           // Set the value of the class attribute
+			elem.setAttributeNode(att);
+		}
+		else
+		{
+			classAttrNode.value=newAttribVal;
+		}
+	}
+	
+	function setClass(elem, newClass)
+	{
+		var classAttrNode = elem.getAttributeNode("class");
+		if(classAttrNode == undefined)
+		{
+			var att = document.createAttribute("class");       // Create a "class" attribute
+			att.value = newClass;                           // Set the value of the class attribute
+			elem.setAttributeNode(att);
+		}
+		else
+		{
+			classAttrNode.value=newClass;
+		}
+	}
+	
+	function userMessageRemove(event)
+	{
+		event.target.remove();
+	}
+	
+	function userMessageStartFade(event)
+	{
+		event.target.getAttributeNode("class").value = "dispMsg fadeOutMsg";
+		
+		event.target.addEventListener("webkitAnimationEnd", userMessageRemove);  // Code for Chrome, Safari and Opera
+		event.target.addEventListener("animationend", userMessageRemove);        // Standard syntax
+	}
+	
+	function displayUserMessage(displayText)
+	{
+		var msgDiv = document.getElementById('msgDiv');
+		var newDiv = document.createElement("DIV");
+		var txtNode = document.createTextNode(displayText);
+		
+		newDiv.appendChild(txtNode);
+		
+		var att = document.createAttribute("class");       // Create a "class" attribute
+		att.value = "dispMsg fadeInMsg";                           // Set the value of the class attribute
+		newDiv.setAttributeNode(att);
+		
+		newDiv.addEventListener("webkitAnimationEnd", userMessageStartFade);  // Code for Chrome, Safari and Opera
+		newDiv.addEventListener("animationend", userMessageStartFade);        // Standard syntax
+		
+		msgDiv.appendChild(newDiv);
+	}
+	
+	chartsData = window.smartmail = {
+		maxDataPoints: 20,
+		liveTimeLabels: [],
+		analogLiveChartData: {
+			hAnalogIR: [],
+			vAnalogIR: []
+		},
+		digitalLiveChartInstances: {
+			hAnalogIRState: 0,
+			vAnalogIRState: 0,
+			doorState: 0
+		},
+		digitalLiveChartConfigs: {
+			hAnalogIRState: 0,
+			vAnalogIRState: 0,
+			doorState: 0
+		},
+		digitalLiveChartData: {
+			hAnalogIRState: [],
+			vAnalogIRState: [],
+			doorState: []
+		},
+		xhttpDataUpdate: [],
+		xhttpLimitUpdate: new XMLHttpRequest(),
+		rawData:[],
+		letterState: 0,
+		updateTime: 1000,
+		debugData: {
+			debugMode: false,
+			pauseMode: false,
+			arrayPos: -1,
+			stringPos: -1,
+			lastKey: 0,
+			// Debug strings have to be unique first letter
+			debugStrings: ["debug", "live", "pause", "resume"],
+			debugTrigger:[function (){chartsData.debugData.debugMode=true; displayUserMessage("Debug Mode Enabled!");},
+				function (){chartsData.debugData.debugMode=false; displayUserMessage("Live Mode Enabled!");},
+				function (){chartsData.debugData.pauseMode=true; displayUserMessage("Live Mode Pause");},
+				function (){chartsData.debugData.pauseMode=false; displayUserMessage("Live Mode Resume");}
+			]
+		},
+		totalTime: 0
+	};
+	
+	function getRandomInt(min, max) {
+	  min = Math.ceil(min);
+	  max = Math.floor(max);
+	  return Math.floor(Math.random() * (max - min) + min);
+	}
+	
+	//generateAnalogChartData();
+	
+	var commonOptions = {
+        responsive: true,
+		maintainAspectRatio: false,
+		scales: {
+			yAxes: [{
+				ticks: {
+					suggestedMin: 0,
+					suggestedMax: 4095,
+					beginAtZero:true
+				}
+			}]
+		},
+        legend: {display: false},
+        tooltips:{
+          enabled: false
+        }
+    };
+	
+	chartsData.analogChartConfig = {
+		type:"line",
+		data: {
+			labels:chartsData.liveTimeLabels,
+			datasets:[{
+					label:"Horizontal IR",
+					data:chartsData.analogLiveChartData.hAnalogIR,
+					fill:false,
+					borderColor:"rgb(75, 192, 192)",
+					lineTension:0.1
+				},
+				{
+					label:"Vertical IR",
+					data:chartsData.analogLiveChartData.vAnalogIR,
+					fill:false,
+					borderColor:"rgb(255, 50, 50)",
+					lineTension:0.1
+				}]
+		},
+		options: Object.assign({}, commonOptions, {
+			legend: {display: true}
+		})
+	};
+	
+	chartsData.digitalLiveChartConfigs.hAnalogIRState = {
+		type:"line",
+		data: {
+			labels:chartsData.liveTimeLabels,
+			datasets:[{
+					label:"Horizontal IR State",
+					data:chartsData.digitalLiveChartData.hAnalogIRState,
+					fill:false,
+					borderColor:"rgb(75, 192, 192)",
+					lineTension:0.1,
+					steppedLine: "middle"
+				}]
+		},
+		options: Object.assign({}, commonOptions, {
+			legend: {display: true},
+			scales: {
+				yAxes: [{
+					ticks: {
+						beginAtZero:true
+					}
+				}]
+			},
+		})
+	};
+	
+	chartsData.digitalLiveChartConfigs.vAnalogIRState = {
+		type:"line",
+		data: {
+			labels:chartsData.liveTimeLabels,
+			datasets:[
+				{
+					label:"Vertical IR State",
+					data:chartsData.digitalLiveChartData.vAnalogIRState,
+					fill:false,
+					borderColor:"rgb(255, 50, 50)",
+					lineTension:0.1,
+					steppedLine: "middle"
+				}]
+		},
+		options: Object.assign({}, commonOptions, {
+			legend: {display: true},
+			scales: {
+				yAxes: [{
+					ticks: {
+						beginAtZero:true
+					}
+				}]
+			},
+		})
+	};
+	
+	chartsData.digitalLiveChartConfigs.doorState = {
+		type:"line",
+		data: {
+			labels:chartsData.liveTimeLabels,
+			datasets:[{
+					label:"Door State",
+					data:chartsData.digitalLiveChartData.doorState,
+					fill:false,
+					borderColor:"rgb(50, 50, 255)",
+					lineTension:0.1,
+					steppedLine: "middle"
+				}]
+		},
+		options: Object.assign({}, commonOptions, {
+			legend: {display: true},
+			scales: {
+				yAxes: [{
+					ticks: {
+						beginAtZero:true
+					}
+				}]
+			},
+		})
+	};
+	
+	function limitArrayLength(larray)
+	{
+		// Remove Extra points for chart arrays
+		if(larray.length >= chartsData.maxDataPoints && chartsData.maxDataPoints > 0)
+		{
+			larray.shift();
+		}
+	}
+	
+	function addSmartMailBoxData(mailData)
+	{
+		// Update rawData holder
+		/*
+		while(chartsData.rawData.length >= chartsData.maxDataPoints && chartsData.maxDataPoints > 0)
+		{
+			chartsData.rawData.shift();
+		}
+		*/
+		
+		// Add new data to rawData
+		//chartsData.rawData.push(mailData);
+		
+		limitArrayLength(chartsData.liveTimeLabels);
+		
+		for (const larray of Object.values(chartsData.analogLiveChartData)) {
+			limitArrayLength(larray);
+		}
+		
+		for (const larray of Object.values(chartsData.digitalLiveChartData)) {
+			limitArrayLength(larray);
+		}
+		
+		
+		// Remove Extra points for chart arrays
+		/*
+		if(chartsData.analogLiveChartData.analogLabels.length >= chartsData.maxDataPoints && chartsData.maxDataPoints > 0)
+		{
+			chartsData.analogLiveChartData.analogLabels.shift();
+		}
+		
+		while(chartsData.analogLiveChartData.hAnalogIR.length >= chartsData.maxDataPoints && chartsData.maxDataPoints > 0)
+		{
+			chartsData.analogLiveChartData.hAnalogIR.shift();
+		}
+		while(chartsData.analogLiveChartData.vAnalogIR.length >= chartsData.maxDataPoints && chartsData.maxDataPoints > 0)
+		{
+			chartsData.analogLiveChartData.vAnalogIR.shift();
+		}
+		*/
+		
+		if(mailData["Current"] != undefined)
+		{
+			// Add Label
+			var localLabel = mailData["Current"]["time"];
+			chartsData.liveTimeLabels.push(localLabel);
+			
+			// Add Horizontal IR value 
+			var localhAnalogIR = mailData["Current"]["HorizontalIRAnalog"];
+			chartsData.analogLiveChartData.hAnalogIR.push(localhAnalogIR);
+			
+			// Add Vertical IR value 
+			var localvAnalogIR = mailData["Current"]["VerticalIRAnalog"];
+			chartsData.analogLiveChartData.vAnalogIR.push(localvAnalogIR);
+			
+			// Add Horizontal IR value 
+			var localhAnalogIRState = mailData["Current"]["HorizontalIRState"];
+			chartsData.digitalLiveChartData.hAnalogIRState.push(localhAnalogIRState);
+			
+			// Add Vertical IR value 
+			var localvAnalogIRState = mailData["Current"]["VerticalIRState"];
+			chartsData.digitalLiveChartData.vAnalogIRState.push(localvAnalogIRState);
+			
+			// Add DoorState value 
+			var localDoorState = mailData["Current"]["DoorState"];
+			chartsData.digitalLiveChartData.doorState.push(localDoorState);
+			
+			// Convert the IRState to letterState
+			if(mailData["Current"]["HorizontalIRState"] == 1 && mailData["Current"]["VerticalIRState"] == 1)
+			{
+				// When the letterState plays audio increase it to 2.
+				// Prevent repeating it.
+				if(chartsData.letterState!=2)
+				{
+					chartsData.letterState=1;
+				}
+			}
+			else if(mailData["Current"]["HorizontalIRState"] != 1 && mailData["Current"]["VerticalIRState"] != 1)
+			{
+				// When the letterState plays audio increase it to 4.
+				// Prevent repeating it.
+				if(chartsData.letterState!=4)
+				{
+					chartsData.letterState=3;
+				}
+			}
+			
+			// Play appropriate 
+			// Mail Removed State
+			if(chartsData.letterState==3)
+			{
+				displayUserMessage("Mail Removed!");
+				document.getElementById("MailRemovedAudio").play();
+				chartsData.letterState=4;
+			}
+			// Mail Received State
+			if(chartsData.letterState==1)
+			{
+				displayUserMessage("You Got Mail!");
+				document.getElementById("GotMailAudio").play();
+				chartsData.letterState=2;
+			}
+		}
+		
+		chartsData.analogChart.update();
+		for(var chart of Object.values(chartsData.digitalLiveChartInstances))
+		{
+			chart.update();
+		}
+	}
+	
+	/*
+	chartsData.xhttpDataUpdate.onreadystatechange = function() {
+		if (this.readyState == 4 && this.status == 200) {
+		   // Typical action to be performed when the document is ready:
+		   addSmartMailBoxData(JSON.parse(chartsData.xhttpDataUpdate.responseText));
+		}
+	};
+	*/
+	
+	function removeFromArray(arr, elem) {
+		for(var i=0; i < arr.length; i++)
+		{
+			if(arr[i] === elem)
+			{
+				arr.splice(i, 1);
+			}
+		}
+	}
+	
+	chartsData.xhttpLimitUpdate.onerror = function() {
+		var limitDiv = document.getElementById("limitDivContainer");
+		
+		setClass(limitDiv, "limitDivFail");
+		removeOnAnimationFinish(limitDiv, "limitDivFail");
+	};
+	
+	chartsData.xhttpLimitUpdate.onreadystatechange = function() {
+		var limitDiv = document.getElementById("limitDivContainer");
+		
+		if (this.readyState == 4 && this.status == 200) {
+		    // Typical action to be performed when the document is ready:
+			//addSmartMailBoxData(JSON.parse(chartsData.xhttpLimitUpdate.responseText));
+			setClass(limitDiv, "limitDivSuccess");
+			removeOnAnimationFinish(limitDiv, "limitDivSuccess");
+			var data = JSON.parse(chartsData.xhttpDataUpdate.responseText);
+		}
+		else
+		{
+			setClass(limitDiv, "limitDivFail");
+			removeOnAnimationFinish(limitDiv, "limitDivFail");
+		}
+	};
+	
+	
+	function generateDummyData()
+	{
+		var data = {
+			"Current":{
+				"time": 1126,
+				"timestr": null,
+				"HorizontalIRAnalog": 4095,
+				"VerticalIRAnalog": 4095,
+				"HorizontalIRState": 0,
+				"VerticalIRState": 0,
+				"DoorState": 0
+			},
+			"Changes":
+				[{
+				"time": 1126,
+				"timestr": null,
+				"HorizontalIRAnalog": 4095,
+				"VerticalIRAnalog": 4095,
+				"HorizontalIRState": 0,
+				"VerticalIRState": 0,
+				"DoorState": 0
+				}]
+		};
+		
+		chartsData.totalTime += getRandomInt(100, 400);
+		data["Current"]["time"] = chartsData.totalTime;
+		data["Current"]["HorizontalIRAnalog"] = getRandomInt(0, 4095);
+		data["Current"]["VerticalIRAnalog"] = getRandomInt(0, 4095);
+		data["Current"]["HorizontalIRState"] = getRandomInt(0, 2);
+		data["Current"]["VerticalIRState"] = getRandomInt(0, 2);
+		data["Current"]["DoorState"] = getRandomInt(0, 2);
+		
+		addSmartMailBoxData(data);
+	}
+	
+	function updateChartData()
+	{
+		if(!chartsData.debugData.pauseMode)
+		{
+			if(chartsData.debugData.debugMode)
+			{
+				// Generate fake data for web testing
+				generateDummyData();
+			}
+			else
+			{
+				// Update data from device
+				var localxhttpDataUpdate = new XMLHttpRequest()
+				localxhttpDataUpdate.onerror = function() {
+					   removeFromArray(chartsData.xhttpDataUpdate, localxhttpDataUpdate);
+				};
+				localxhttpDataUpdate.onreadystatechange = function() {
+					if (this.readyState == 4 && this.status == 200) {
+					   // Typical action to be performed when the document is ready:
+					   addSmartMailBoxData(JSON.parse(localxhttpDataUpdate.responseText));
+					}
+					removeFromArray(chartsData.xhttpDataUpdate, localxhttpDataUpdate);
+				};
+				chartsData.xhttpDataUpdate.push(localxhttpDataUpdate);
+				localxhttpDataUpdate.open("POST", "smartmail-data.json", true);
+				localxhttpDataUpdate.send();
+			}
+		}
+	}
+	
+	window.onkeydown = function(event) {
+		if(event.key != chartsData.debugData.lastKey)
+		{
+			if(chartsData.debugData.arrayPos == -1)
+			{
+				var count=0;
+				for(var curStr of chartsData.debugData.debugStrings)
+				{
+					if(curStr[0] == event.key)
+					{
+						chartsData.debugData.arrayPos=count;
+						chartsData.debugData.stringPos = 1;
+						displayUserMessage("User Pressed "+event.key+"!");
+					}
+					count++;
+				}
+			}
+			else
+			{
+				var isKeyValid=false;
+				if(chartsData.debugData.arrayPos >= 0 &&
+				   chartsData.debugData.arrayPos < chartsData.debugData.debugStrings.length &&
+				   chartsData.debugData.stringPos >= 0 &&
+				   chartsData.debugData.stringPos < chartsData.debugData.debugStrings[chartsData.debugData.arrayPos].length)
+				{
+					if(event.key == chartsData.debugData.debugStrings[chartsData.debugData.arrayPos][chartsData.debugData.stringPos])
+					{
+						displayUserMessage("User Pressed "+event.key+"!");
+						isKeyValid=true;
+						chartsData.debugData.stringPos++;
+						if(chartsData.debugData.stringPos == chartsData.debugData.debugStrings[chartsData.debugData.arrayPos].length)
+						{
+							chartsData.debugData.debugTrigger[chartsData.debugData.arrayPos]();
+							isKeyValid=false;
+						}
+					}
+				}
+				
+				if(isKeyValid == false)
+				{
+					chartsData.debugData.arrayPos=-1;
+					chartsData.debugData.stringPos=-1;
+				}
+			}
+			
+			//debugString
+		}
+		chartsData.debugData.lastKey = event.key;
+	};
+	
+	window.onload = function() {	
+		var alctx = document.getElementById('analogLiveChart').getContext('2d');
+		
+		var hIRSctx = document.getElementById('hIRStateLiveChart').getContext('2d');
+		
+		var vIRSctx = document.getElementById('vIRStateLiveChart').getContext('2d');
+		
+		var doorlctx = document.getElementById('doorLiveChart').getContext('2d');
+		
+		chartsData.analogChart = new Chart(alctx, chartsData.analogChartConfig);
+		
+		chartsData.digitalLiveChartInstances.hAnalogIRState = new Chart(hIRSctx, chartsData.digitalLiveChartConfigs.hAnalogIRState);
+		
+		chartsData.digitalLiveChartInstances.vAnalogIRState = new Chart(vIRSctx, chartsData.digitalLiveChartConfigs.vAnalogIRState);
+		
+		chartsData.digitalLiveChartInstances.doorState = new Chart(doorlctx, chartsData.digitalLiveChartConfigs.doorState);
+		
+		chartsData.totalTime=0;
+		
+		//document.getElementById('submitLimit').onclick = function() {
+		var analogLimitForm = document.getElementById("analogLimitForm");
+		analogLimitForm.onsubmit = function(event) {
+			event.preventDefault();
+			
+			// Update data from device
+			chartsData.xhttpLimitUpdate.open("POST", "update-limit.json", true);
+			
+			//chartsData.xhttpLimitUpdate.setRequestHeader("Content-Type", "application/json");
+			
+			/*
+			var dataStr="["+document.getElementById("hAnalogIRLimitHigh").value+","+
+			document.getElementById("hAnalogIRLimitLow").value+","+
+			document.getElementById("vAnalogIRLimitHigh").value+","+
+			document.getElementById("vAnalogIRLimitLow").value+"]";
+			*/
+			
+			var analogLimitFormData = new FormData(document.getElementById("analogLimitForm"));
+			var limitDiv = document.getElementById("limitDivContainer");
+			
+			setClass(limitDiv, "limitDivLoading");
+			
+			chartsData.xhttpLimitUpdate.send(analogLimitFormData);
+			//chartsData.xhttpLimitUpdate.send(dataStr);
+		};
+		
+		var updateRateForm = document.getElementById("updateRateForm");
+		var updateTimeMSElem = document.getElementById("updateTimeMS");
+		setAttribute(updateTimeMSElem, "value", chartsData.updateTime.toString());
+		updateRateForm.onsubmit = function(event) {
+			event.preventDefault();
+			
+			chartsData.updateTime = parseInt(updateTimeMSElem.value, 10);
+			window.clearTimeout(chartsData.chartUpateTimeRef);
+			chartsData.chartUpateTimeRef = window.setInterval(updateChartData, chartsData.updateTime);
+		};
+		
+		// Temporary Timer Update Function
+		chartsData.chartUpateTimeRef = window.setInterval(updateChartData, chartsData.updateTime);
+	};
+	
+	window.onunload = function() {
+		window.clearTimeout(chartsData.chartUpateTimeRef);
+	};
+	
+	</script></div>
+	<div id="limitDivContainer">
+		<form id='analogLimitForm'>
+		<div class="singleLine">horizontal IR</div>
+		<div class="limitSingleContainer">
+			<div class="singleLine">High</div><input id="hAnalogIRLimitHigh" name="hAnalogIRLimitHigh"/>
+			<div class="singleLine">Low</div><input id="hAnalogIRLimitLow" name="hAnalogIRLimitLow"/>
+		</div>
+		<div class="singleLine">vertical IR</div>
+		<div class="limitSingleContainer">
+			<div class="singleLine">High</div><input id="vAnalogIRLimitHigh" name="vAnalogIRLimitHigh"/>
+			<div class="singleLine">Low</div><input id="vAnalogIRLimitLow" name="vAnalogIRLimitLow"/>
+		</div>
+		<input id="submitLimit" type="submit" value="Submit"/> 
+		</form>
+	</div>
+	<div>
+		<form id='updateRateForm'>
+		<div class="singleLine">Update (ms)</div><input id="updateTimeMS" name="updateTimeMS"/>
+		<input id="submitUpdateRate" type="submit" value="Submit"/> 
+		</form>
+	</div>
+	<div id="msgDiv"></div>
+  </body>
+</html>

@@ -1,6 +1,7 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
   <head>
-    <title>ESP32 Demo</title>
+    <title>SmartMail Box Demo</title>
 	<!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.13.0/moment.min.js"></script> -->
 	<script src='https://cdn.jsdelivr.net/npm/chart.js@2.9.3/dist/Chart.min.js'></script>
     <style>
@@ -19,6 +20,21 @@
 		from {opacity: 1.0;}
 		to {opacity: 0;}
 	  }
+	  @keyframes LoadingCrossFade {
+		from {background-color: rgb(190, 255, 190);}
+		to {background-color: rgb(190, 190, 255);}
+	  }
+	  
+	  @keyframes LimitDivSuccess {
+		from {background-color: rgb(120, 120, 255);}
+		to {background-color: rgb(190, 190, 255);}
+	  }
+	  
+	  @keyframes LimitDivFail {
+		from {background-color: rgb(255, 120, 120);}
+		to {background-color: rgb(255, 190, 190);}
+	  }
+	  
 	  .dispMsg {
 		background: rgba(200, 255, 200, 0.65);
 		padding: 5px 10px 5px 10px;
@@ -38,10 +54,51 @@
 		animation-duration: 4s;
 		animation-iteration-count: 1;
 	  }
+	  
+	  .singleLine {
+		display: inline-block;
+	  }
+	  
+	  .limitSingleContainer {
+		display: inline-block;
+		border: 1px solid rgb(100, 150, 255);
+		padding: 4px 5px 4px 5px;
+		margin: 1px 1px 1px 1px;
+	  }
+	  
+	  .limitDivLoading {
+		animation-name: LoadingCrossFade;
+		animation-duration: 4s;
+		animation-iteration-count: infinite;
+	  }
+	  
+	  .limitDivSuccess {
+		animation-name: LimitDivSuccess;
+		animation-duration: 4s;
+		animation-iteration-count: 1;
+	  }
+	  
+	  .limitDivFail {
+		animation-name: LimitDivFail;
+		animation-duration: 4s;
+		animation-iteration-count: 1;
+	  }
+	  
+	  #limitDivContainer {
+		display: inline-block;
+	  }
     </style>
   </head>
   <body>
     <h1>Smartmail Box</h1>
+	<audio id="GotMailAudio">
+		<source src="YouGotMail.mp3" type="audio/mpeg">
+		Your browser does not support the audio element.
+	</audio>
+	<audio id="MailRemovedAudio">
+		<source src="MailRemoved.mp3" type="audio/mpeg">
+		Your browser does not support the audio element.
+	</audio>
 	<div class="charts-container">
 		<div class="chart-container" style="position: relative; height:40vh; width:90vw">
 			<canvas id="analogLiveChart" width="undefined" height="undefined"></canvas>
@@ -58,6 +115,51 @@
 			</div>
 		</div>
 	<script>
+	
+	function removeOnAnimationFinish(elem, rClass)
+	{
+		var autoRemoveOnAnimationFinish = function(event) {
+			var node = event.target.getAttributeNode("class");
+			if(node != undefined)
+			{
+				node.value = node.value.replace(rClass, "");
+			}
+			elem.removeEventListener("webkitAnimationEnd", autoRemoveOnAnimationFinish);
+			elem.removeEventListener("animationend", autoRemoveOnAnimationFinish);
+		}
+		elem.addEventListener("webkitAnimationEnd", autoRemoveOnAnimationFinish);  // Code for Chrome, Safari and Opera
+		elem.addEventListener("animationend", autoRemoveOnAnimationFinish);        // Standard syntax
+	}
+	
+	function setAttribute(elem, attrib, newAttribVal)
+	{
+		var classAttrNode = elem.getAttributeNode(attrib);
+		if(classAttrNode == undefined)
+		{
+			var att = document.createAttribute(attrib);       // Create a "class" attribute
+			att.value = newAttribVal;                           // Set the value of the class attribute
+			elem.setAttributeNode(att);
+		}
+		else
+		{
+			classAttrNode.value=newAttribVal;
+		}
+	}
+	
+	function setClass(elem, newClass)
+	{
+		var classAttrNode = elem.getAttributeNode("class");
+		if(classAttrNode == undefined)
+		{
+			var att = document.createAttribute("class");       // Create a "class" attribute
+			att.value = newClass;                           // Set the value of the class attribute
+			elem.setAttributeNode(att);
+		}
+		else
+		{
+			classAttrNode.value=newClass;
+		}
+	}
 	
 	function userMessageRemove(event)
 	{
@@ -112,17 +214,24 @@
 			vAnalogIRState: [],
 			doorState: []
 		},
-		xhttp: new XMLHttpRequest(),
+		xhttpDataUpdate: [],
+		xhttpLimitUpdate: new XMLHttpRequest(),
 		rawData:[],
+		letterState: 0,
+		updateTime: 1000,
+		delayBeforeUpdate: 0,
 		debugData: {
 			debugMode: false,
+			pauseMode: false,
 			arrayPos: -1,
 			stringPos: -1,
 			lastKey: 0,
 			// Debug strings have to be unique first letter
-			debugStrings: ["debug", "live"],
+			debugStrings: ["debug", "live", "pause", "resume"],
 			debugTrigger:[function (){chartsData.debugData.debugMode=true; displayUserMessage("Debug Mode Enabled!");},
-				function (){chartsData.debugData.debugMode=false; displayUserMessage("Live Mode Enabled!");}
+				function (){chartsData.debugData.debugMode=false; displayUserMessage("Live Mode Enabled!");},
+				function (){chartsData.debugData.pauseMode=true; displayUserMessage("Live Mode Pause");},
+				function (){chartsData.debugData.pauseMode=false; displayUserMessage("Live Mode Resume");}
 			]
 		},
 		totalTime: 0
@@ -329,6 +438,42 @@
 			// Add DoorState value 
 			var localDoorState = mailData["Current"]["DoorState"];
 			chartsData.digitalLiveChartData.doorState.push(localDoorState);
+			
+			// Convert the IRState to letterState
+			if(mailData["Current"]["HorizontalIRState"] == 1 && mailData["Current"]["VerticalIRState"] == 1)
+			{
+				// When the letterState plays audio increase it to 2.
+				// Prevent repeating it.
+				if(chartsData.letterState!=2)
+				{
+					chartsData.letterState=1;
+				}
+			}
+			else if(mailData["Current"]["HorizontalIRState"] != 1 && mailData["Current"]["VerticalIRState"] != 1)
+			{
+				// When the letterState plays audio increase it to 4.
+				// Prevent repeating it.
+				if(chartsData.letterState!=4)
+				{
+					chartsData.letterState=3;
+				}
+			}
+			
+			// Play appropriate 
+			// Mail Removed State
+			if(chartsData.letterState==3)
+			{
+				chartsData.letterState=4;
+				displayUserMessage("Mail Removed!");
+				document.getElementById("MailRemovedAudio").play();
+			}
+			// Mail Received State
+			if(chartsData.letterState==1)
+			{
+				chartsData.letterState=2;
+				displayUserMessage("You Got Mail!");
+				document.getElementById("GotMailAudio").play();
+			}
 		}
 		
 		chartsData.analogChart.update();
@@ -338,10 +483,46 @@
 		}
 	}
 	
-	chartsData.xhttp.onreadystatechange = function() {
+	/*
+	chartsData.xhttpDataUpdate.onreadystatechange = function() {
 		if (this.readyState == 4 && this.status == 200) {
 		   // Typical action to be performed when the document is ready:
-		   addSmartMailBoxData(JSON.parse(chartsData.xhttp.responseText));
+		   addSmartMailBoxData(JSON.parse(chartsData.xhttpDataUpdate.responseText));
+		}
+	};
+	*/
+	
+	function removeFromArray(arr, elem) {
+		for(var i=0; i < arr.length; i++)
+		{
+			if(arr[i] === elem)
+			{
+				arr.splice(i, 1);
+			}
+		}
+	}
+	
+	chartsData.xhttpLimitUpdate.onerror = function() {
+		var limitDiv = document.getElementById("limitDivContainer");
+		
+		setClass(limitDiv, "limitDivFail");
+		removeOnAnimationFinish(limitDiv, "limitDivFail");
+	};
+	
+	chartsData.xhttpLimitUpdate.onreadystatechange = function() {
+		var limitDiv = document.getElementById("limitDivContainer");
+		
+		if (this.readyState == 4 && this.status == 200) {
+		    // Typical action to be performed when the document is ready:
+			//addSmartMailBoxData(JSON.parse(chartsData.xhttpLimitUpdate.responseText));
+			setClass(limitDiv, "limitDivSuccess");
+			removeOnAnimationFinish(limitDiv, "limitDivSuccess");
+			var data = JSON.parse(chartsData.xhttpDataUpdate.responseText);
+		}
+		else
+		{
+			setClass(limitDiv, "limitDivFail");
+			removeOnAnimationFinish(limitDiv, "limitDivFail");
 		}
 	};
 	
@@ -382,17 +563,32 @@
 	}
 	
 	function updateChartData()
-	{		
-		if(chartsData.debugData.debugMode)
+	{
+		if(!chartsData.debugData.pauseMode)
 		{
-			// Generate fake data for web testing
-			generateDummyData();
-		}
-		else
-		{
-			// Update data from device
-			chartsData.xhttp.open("GET", "smartmail-data.json", true);
-			chartsData.xhttp.send();
+			if(chartsData.debugData.debugMode)
+			{
+				// Generate fake data for web testing
+				generateDummyData();
+			}
+			else
+			{
+				// Update data from device
+				var localxhttpDataUpdate = new XMLHttpRequest()
+				localxhttpDataUpdate.onerror = function() {
+					   removeFromArray(chartsData.xhttpDataUpdate, localxhttpDataUpdate);
+				};
+				localxhttpDataUpdate.onreadystatechange = function() {
+					if (this.readyState == 4 && this.status == 200) {
+					   // Typical action to be performed when the document is ready:
+					   addSmartMailBoxData(JSON.parse(localxhttpDataUpdate.responseText));
+					}
+					removeFromArray(chartsData.xhttpDataUpdate, localxhttpDataUpdate);
+				};
+				chartsData.xhttpDataUpdate.push(localxhttpDataUpdate);
+				localxhttpDataUpdate.open("POST", "cgi-bin/smartmail-data.py", true);
+				localxhttpDataUpdate.send();
+			}
 		}
 	}
 	
@@ -465,15 +661,75 @@
 		
 		chartsData.totalTime=0;
 		
-		// Temporary Timer Update Function
-		chartsData.chartUpateTimeRef = window.setInterval(updateChartData, 1000);
+		//document.getElementById('submitLimit').onclick = function() {
+		var analogLimitForm = document.getElementById("analogLimitForm");
+		analogLimitForm.onsubmit = function(event) {
+			event.preventDefault();
+			
+			// Update data from device
+			chartsData.xhttpLimitUpdate.open("POST", "cgi-bin/update-limit.py", true);
+			
+			//chartsData.xhttpLimitUpdate.setRequestHeader("Content-Type", "application/json");
+			
+			/*
+			var dataStr="["+document.getElementById("hAnalogIRLimitHigh").value+","+
+			document.getElementById("hAnalogIRLimitLow").value+","+
+			document.getElementById("vAnalogIRLimitHigh").value+","+
+			document.getElementById("vAnalogIRLimitLow").value+"]";
+			*/
+			
+			var analogLimitFormData = new FormData(document.getElementById("analogLimitForm"));
+			var limitDiv = document.getElementById("limitDivContainer");
+			
+			setClass(limitDiv, "limitDivLoading");
+			
+			chartsData.xhttpLimitUpdate.send(analogLimitFormData);
+			//chartsData.xhttpLimitUpdate.send(dataStr);
+		};
+		
+		var updateRateForm = document.getElementById("updateRateForm");
+		var updateTimeMSElem = document.getElementById("updateTimeMS");
+		setAttribute(updateTimeMSElem, "value", chartsData.updateTime.toString());
+		updateRateForm.onsubmit = function(event) {
+			event.preventDefault();
+			
+			chartsData.updateTime = parseInt(updateTimeMSElem.value, 10);
+			window.clearTimeout(chartsData.chartUpateTimeRef);
+			chartsData.chartUpateTimeRef = window.setInterval(updateChartData, chartsData.updateTime);
+		};
+		
+		window.setTimeout(function(){
+			// Temporary Timer Update Function
+			chartsData.chartUpateTimeRef = window.setInterval(updateChartData, chartsData.updateTime);
+		}, chartsData.delayBeforeUpdate);
 	};
 	
 	window.onunload = function() {
-		clearTimeout(chartsData.chartUpateTimeRef);
+		window.clearTimeout(chartsData.chartUpateTimeRef);
 	};
 	
 	</script></div>
+	<div id="limitDivContainer">
+		<form id='analogLimitForm'>
+		<div class="singleLine">horizontal IR</div>
+		<div class="limitSingleContainer">
+			<div class="singleLine">High</div><input id="hAnalogIRLimitHigh" name="hAnalogIRLimitHigh"/>
+			<div class="singleLine">Low</div><input id="hAnalogIRLimitLow" name="hAnalogIRLimitLow"/>
+		</div>
+		<div class="singleLine">vertical IR</div>
+		<div class="limitSingleContainer">
+			<div class="singleLine">High</div><input id="vAnalogIRLimitHigh" name="vAnalogIRLimitHigh"/>
+			<div class="singleLine">Low</div><input id="vAnalogIRLimitLow" name="vAnalogIRLimitLow"/>
+		</div>
+		<input id="submitLimit" type="submit" value="Submit"/> 
+		</form>
+	</div>
+	<div>
+		<form id='updateRateForm'>
+		<div class="singleLine">Update (ms)</div><input id="updateTimeMS" name="updateTimeMS"/>
+		<input id="submitUpdateRate" type="submit" value="Submit"/> 
+		</form>
+	</div>
 	<div id="msgDiv"></div>
   </body>
 </html>

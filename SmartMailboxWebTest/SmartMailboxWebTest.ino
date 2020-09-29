@@ -7,9 +7,12 @@
 #include "UpdateCaller.h"
 #include "BoolWatch.h"
 #include "chartjs.html_hex.h"
+#include "chart.js-2.8.0.js_hex.h"
+#include "MailRemoved.mp3_hex.h"
+#include "YouGotMail.mp3_hex.h"
 
-const char *ssid = "WifiName";
-const char *password = "password";
+const char *ssid = "yourwifi";
+const char *password = "yourpassword";
 
 WebServer server(80);
 
@@ -47,12 +50,6 @@ UpdateCaller SensorUpdater(UPDATE_INTERVAL);
 
 void handleRoot() {
   server.send(200, "text/html", chartjs_html);
-  for(int i=0; i<50; i++)
-  {
-    Serial.print(chartjs_html[i]);
-  }
-  Serial.println("");
-  delay(1000);
 }
 
 void handleMailboxDataUpdate() {
@@ -239,8 +236,36 @@ void setup() {
     Serial.println("MDNS responder started");
   }
 
+  String temp = MailRemoved_mp3;
+  Serial.print("** MailRemoved_mp3 sizes sizeof(");
+  Serial.print(sizeof(MailRemoved_mp3));
+  Serial.print(") String& .length() ");
+  Serial.println(temp.length());
+
   server.on("/", handleRoot);
+  server.on("/chart.js-2.8.0.js", []() {server.send(200, "application/javascript", chart_js_2_8_0_js, sizeof(chart_js_2_8_0_js));});
+  server.on("/MailRemoved.mp3", []() {server.send(200, "audio/mpeg", MailRemoved_mp3, sizeof(MailRemoved_mp3));});
+  server.on("/YouGotMail.mp3", []() {server.send(200, "audio/mpeg", YouGotMail_mp3, sizeof(YouGotMail_mp3));});
   server.on("/smartmail-data.json", handleMailboxDataUpdate);
+  server.on("/update-limit.json", HTTP_POST, []() {
+      server.sendHeader("Connection", "close");
+      server.send(200, "text/plain", "OK");
+    }, []() {
+      HTTPUpload& upload = server.upload();
+      if (upload.status == UPLOAD_FILE_START) {
+        Serial.setDebugOutput(true);
+        Serial.printf("Upload file: %s\n", upload.filename.c_str());
+      } else if (upload.status == UPLOAD_FILE_WRITE) {
+        // write(upload.buf, upload.currentSize) != upload.currentSize
+        Serial.println("Received Upload 'update-limit'---");
+        Serial.print((char*)upload.buf);
+        Serial.print("---");
+      } else if (upload.status == UPLOAD_FILE_END) {
+        Serial.setDebugOutput(false);
+      } else {
+        Serial.printf("Update Failed Unexpectedly (likely broken connection): status=%d\n", upload.status);
+      }
+    });
   server.onNotFound(handleNotFound);
   server.begin();
   Serial.println("HTTP server started");
